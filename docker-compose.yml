@@ -1,0 +1,54 @@
+# ══════════════════════════════════════
+#  THREAT-SCOPE — docker-compose.yml
+#
+#  Uso:
+#    docker compose up -d          # levantar
+#    docker compose down           # detener (datos persisten)
+#    docker compose down -v        # detener Y borrar datos
+# ══════════════════════════════════════
+
+
+services:
+  threat-scope:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: threat-scope
+    restart: unless-stopped
+    ports:
+      - "3000:3000"       # Cambia el puerto izquierdo si necesitas otro: "8080:3000"
+    environment:
+      - PORT=3000
+      - DATA_DIR=/data
+      - NODE_ENV=production
+    volumes:
+      # ────────────────────────────────────────────────────────
+      # VOLUMEN DE PERSISTENCIA
+      # Todos los datos (dashboard.json + imágenes de evidencia)
+      # se guardan aquí y sobreviven al reinicio del contenedor.
+      # ────────────────────────────────────────────────────────
+      - threat-scope-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# ── Named volume (gestionado por Docker) ──────────────────
+# Los datos se almacenan en el host en:
+#   Linux/Mac: /var/lib/docker/volumes/threat-scope-data/_data
+#   Windows:   \\wsl$\docker-desktop-data\...
+#
+# Para backup:
+#   docker run --rm -v threat-scope-data:/data -v $(pwd):/backup \
+#     alpine tar czf /backup/threat-scope-backup.tar.gz /data
+# ──────────────────────────────────────────────────────────
+volumes:
+  threat-scope-data:
+    driver: local

@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Threat-Scope</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;800&family=Share+Tech+Mono&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <!-- docx library for .docx report generation -->
+  <script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- TOP BAR -->
+  <header class="topbar" role="banner">
+    <div class="topbar__left">
+      <img src="assets/img/logo.png" class="topbar__logo" alt="Logo Threat-Scope" onerror="this.style.display='none'">
+      <div class="topbar__title-wrap">
+        <div class="topbar__title">THREAT-SCOPE <span class="topbar__version">v2.0</span></div>
+        <div class="topbar__subtitle">Vulnerability Intelligence Dashboard</div>
+      </div>
+    </div>
+    <div class="topbar__right">
+      <div class="save-indicator" id="saveIndicator" title="Estado de guardado"></div>
+      <button class="btn btn--ip" id="btnIp" type="button" title="IPs cargadas">
+        <span class="btn__icon">◉</span>
+        <span class="btn__text" id="ipCount">0 IPs</span>
+      </button>
+      <div class="menu" id="actionsMenu">
+        <button class="btn btn--plus" id="btnPlus" type="button"
+          aria-haspopup="true" aria-expanded="false" aria-controls="dropdown">
+          <span class="btn__plus" aria-hidden="true">+</span>
+          <span class="sr-only">Abrir menú</span>
+        </button>
+        <div class="dropdown" id="dropdown" role="menu">
+          <div class="dropdown__section-label">IMPORTAR</div>
+          <button class="dropdown__item" id="actionAddIp">
+            <span class="dropdown__item-icon">⊕</span> Agregar dirección IP manual
+          </button>
+          <label class="dropdown__item dropdown__item--file">
+            <span class="dropdown__item-icon">⬆</span> Cargar escaneo XML
+            <input id="fileXml" type="file" accept=".xml,text/xml,application/xml" hidden multiple />
+          </label>
+          <label class="dropdown__item dropdown__item--file">
+            <span class="dropdown__item-icon">⬆</span> Importar dashboard (.json)
+            <input id="fileJson" type="file" accept=".json,application/json" hidden />
+          </label>
+          <div class="dropdown__separator"></div>
+          <div class="dropdown__section-label">EXPORTAR</div>
+          <button class="dropdown__item" id="actionExportJson">
+            <span class="dropdown__item-icon">⬇</span> Exportar dashboard completo (.json)
+          </button>
+          <button class="dropdown__item" id="actionExportIpJson">
+            <span class="dropdown__item-icon">⬇</span> Exportar IP actual (.json)
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- TABS BAR -->
+  <nav class="tabs-bar" id="tabsBar" role="tablist">
+    <button class="tab tab--active" id="tab-summary" role="tab" data-tab="summary">
+      <span class="tab__icon">⬡</span> RESUMEN GLOBAL
+    </button>
+  </nav>
+
+  <!-- MAIN CONTENT -->
+  <main class="page" id="mainContent">
+
+    <!-- ═══ SUMMARY PANEL ═══ -->
+    <section class="panel" id="panel-summary">
+
+      <!-- Org filter -->
+      <div class="summary-filters" id="summaryOrgFilter" style="display:none">
+        <div class="filter-group">
+          <label class="filter-label">FILTRAR POR ORGANIZACIÓN</label>
+          <div class="filter-chips" id="summaryOrgChips">
+            <button class="chip chip--active" data-org="all">Todas</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="stats-grid" id="summaryStats"></div>
+
+      <!-- Charts row 1 -->
+      <div class="charts-row">
+        <div class="chart-card chart-card--wide">
+          <div class="chart-card__header">
+            <span class="chart-card__title">VULNERABILIDADES POR IP</span>
+            <span class="chart-card__badge" id="totalVulnsBadge">0 total</span>
+          </div>
+          <div class="chart-wrap"><canvas id="chartByIp"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card__header">
+            <span class="chart-card__title">DISTRIBUCIÓN POR CRITICIDAD</span>
+          </div>
+          <div class="chart-wrap chart-wrap--doughnut"><canvas id="chartGlobalDist"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Charts row 2 -->
+      <div class="charts-row charts-row--halves">
+        <div class="chart-card">
+          <div class="chart-card__header">
+            <span class="chart-card__title">ESTADO GLOBAL DE VULNERABILIDADES</span>
+          </div>
+          <div class="chart-wrap chart-wrap--doughnut"><canvas id="chartGlobalStatus"></canvas></div>
+        </div>
+        <div class="chart-card" id="summaryOrgChart" style="display:none">
+          <div class="chart-card__header">
+            <span class="chart-card__title">VULNERABILIDADES POR ORGANIZACIÓN</span>
+          </div>
+          <div class="chart-wrap chart-wrap--doughnut"><canvas id="chartByOrg"></canvas></div>
+        </div>
+      </div>
+
+      <div class="section-header">
+        <span class="section-title">RESUMEN POR DIRECCIÓN IP</span>
+      </div>
+      <div class="table-wrap">
+        <table class="vuln-table">
+          <thead>
+            <tr>
+              <th>DIRECCIÓN IP</th>
+              <th>ORGANIZACIÓN</th>
+              <th>SCANNER</th>
+              <th><span class="sev sev--critical">CRÍTICA</span></th>
+              <th><span class="sev sev--high">ALTA</span></th>
+              <th><span class="sev sev--medium">MEDIA</span></th>
+              <th><span class="sev sev--low">BAJA</span></th>
+              <th><span class="sev sev--info">INFO</span></th>
+              <th>TOTAL</th>
+              <th>EXPLOTADAS</th>
+              <th>PARCHEADAS</th>
+              <th>F. POSITIVOS</th>
+            </tr>
+          </thead>
+          <tbody id="summaryTableBody">
+            <tr class="table-empty"><td colspan="12">No hay datos. Carga un archivo XML o JSON.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ═══ IP PANEL TEMPLATE ═══ -->
+    <template id="ipPanelTemplate">
+      <section class="panel panel--ip" data-ip="">
+        <div class="ip-header">
+          <div class="ip-header__info">
+            <span class="ip-badge"></span>
+            <span class="ip-org-badge"></span>
+            <span class="ip-scanner-badge"></span>
+            <span class="ip-scan-date"></span>
+          </div>
+          <div class="ip-header__actions">
+            <button class="btn btn--report btn--sm ip-report-btn" title="Generar reporte Word (.docx)">
+              📄 Generar Reporte
+            </button>
+            <button class="btn btn--danger btn--sm ip-delete-btn">🗑 Eliminar IP</button>
+          </div>
+        </div>
+
+        <div class="stats-grid ip-stats"></div>
+
+        <div class="charts-row">
+          <div class="chart-card chart-card--wide">
+            <div class="chart-card__header">
+              <span class="chart-card__title">VULNERABILIDADES POR PUERTO</span>
+            </div>
+            <div class="chart-wrap chart-wrap--tall"><canvas class="chart-by-port"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card__header">
+              <span class="chart-card__title">DISTRIBUCIÓN POR CRITICIDAD</span>
+            </div>
+            <div class="chart-wrap chart-wrap--doughnut"><canvas class="chart-dist"></canvas></div>
+          </div>
+        </div>
+
+        <div class="charts-row charts-row--halves">
+          <div class="chart-card">
+            <div class="chart-card__header">
+              <span class="chart-card__title">ESTADO DE VULNERABILIDADES</span>
+            </div>
+            <div class="chart-wrap chart-wrap--doughnut"><canvas class="chart-status"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card__header">
+              <span class="chart-card__title">PROGRESO DE REMEDIACIÓN POR CRITICIDAD</span>
+            </div>
+            <div class="chart-wrap chart-wrap--doughnut"><canvas class="chart-remediation"></canvas></div>
+          </div>
+        </div>
+
+        <div class="section-header">
+          <span class="section-title">LISTADO DE VULNERABILIDADES</span>
+        </div>
+
+        <div class="filter-bar">
+          <div class="filter-group">
+            <label class="filter-label">CRITICIDAD</label>
+            <div class="filter-chips">
+              <button class="chip chip--active" data-filter="severity" data-value="all">Todas</button>
+              <button class="chip chip--critical" data-filter="severity" data-value="critical">Crítica</button>
+              <button class="chip chip--high" data-filter="severity" data-value="high">Alta</button>
+              <button class="chip chip--medium" data-filter="severity" data-value="medium">Media</button>
+              <button class="chip chip--low" data-filter="severity" data-value="low">Baja</button>
+              <button class="chip chip--info" data-filter="severity" data-value="info">Info</button>
+            </div>
+          </div>
+          <div class="filter-group">
+            <label class="filter-label">ESTADO</label>
+            <div class="filter-chips">
+              <button class="chip chip--active" data-filter="status" data-value="all">Todos</button>
+              <button class="chip" data-filter="status" data-value="pending">Pendiente</button>
+              <button class="chip chip--exploited" data-filter="status" data-value="exploited">Explotada</button>
+              <button class="chip chip--patched" data-filter="status" data-value="patched">Parcheada</button>
+              <button class="chip chip--fp" data-filter="status" data-value="false_positive">Falso Positivo</button>
+            </div>
+          </div>
+          <div class="filter-group">
+            <label class="filter-label">SCANNER</label>
+            <div class="filter-chips scanner-chips">
+              <button class="chip chip--active" data-filter="scanner" data-value="all">Todos</button>
+            </div>
+          </div>
+          <div class="filter-group filter-group--search">
+            <label class="filter-label">BUSCAR</label>
+            <input type="text" class="filter-search" placeholder="CVE, nombre, puerto…">
+          </div>
+        </div>
+
+        <div class="vuln-list"></div>
+      </section>
+    </template>
+
+  </main>
+
+  <!-- MODAL: Add IP -->
+  <div class="modal-overlay" id="modalAddIp" hidden>
+    <div class="modal">
+      <div class="modal__header">
+        <span class="modal__title">AGREGAR DIRECCIÓN IP</span>
+        <button class="modal__close" id="modalAddIpClose">✕</button>
+      </div>
+      <div class="modal__body">
+        <label class="modal__label">Dirección IP *</label>
+        <input class="modal__input" type="text" id="inputIpAddress" placeholder="192.168.1.1" />
+        <label class="modal__label">Organización</label>
+        <input class="modal__input" type="text" id="inputIpOrg" placeholder="ACME Corp / Área de TI" />
+        <label class="modal__label">Descripción (opcional)</label>
+        <input class="modal__input" type="text" id="inputIpDesc" placeholder="Servidor web principal" />
+      </div>
+      <div class="modal__footer">
+        <button class="btn btn--ghost" id="modalAddIpCancel">Cancelar</button>
+        <button class="btn btn--red" id="modalAddIpConfirm">Agregar IP</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Evidence lightbox -->
+  <div class="modal-overlay evidence-lightbox" id="evidenceLightbox" hidden>
+    <div class="lightbox">
+      <button class="lightbox__close" id="lightboxClose">✕</button>
+      <img class="lightbox__img" id="lightboxImg" src="" alt="Evidencia" />
+      <div class="lightbox__caption" id="lightboxCaption"></div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+  <script src="report.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
