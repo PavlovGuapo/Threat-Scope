@@ -407,29 +407,76 @@ function importFromJson(json) {
   const data = json.ips || json;
   Object.entries(data).forEach(([ip, ipData]) => {
     if(state.ips[ip]) {
-      const existIds = new Set(state.ips[ip].vulns.map(v=>v.id));
+      const existIds = new Set(state.ips[ip].vulns.map(v => v.id));
+      const existKeys = new Set(state.ips[ip].vulns.map(v => `${v.name}|${v.port}|${v.protocol}`.toLowerCase()));
+      
       (ipData.vulns||[]).forEach(nv => {
-        if(!existIds.has(nv.id)) state.ips[ip].vulns.push({evidence:[],...nv});
-        else {
-          const ev = state.ips[ip].vulns.find(v=>v.id===nv.id);
-          if(ev && nv.status && nv.status!=="pending") ev.status = nv.status;
+        const key = `${nv.name}|${nv.port}|${nv.protocol}`.toLowerCase();
+        if(!existIds.has(nv.id) && !existKeys.has(key)) {
+          state.ips[ip].vulns.push({evidence:[], ...nv});
+          existIds.add(nv.id);
+          existKeys.add(key);
+        } else {
+          const ev = state.ips[ip].vulns.find(v => v.id === nv.id || `${v.name}|${v.port}|${v.protocol}`.toLowerCase() === key);
+          if(ev && nv.status && nv.status !== "pending") ev.status = nv.status;
         }
       });
-      if(!state.ips[ip].scanner.includes(ipData.scanner||"")) state.ips[ip].scanner += ", "+(ipData.scanner||"");
+      
+      const newScanners = (ipData.scanner || "").split(",").map(s => s.trim());
+      const currScanners = state.ips[ip].scanner.split(",").map(s => s.trim());
+      newScanners.forEach(ns => {
+        if(ns && !currScanners.includes(ns)) {
+          state.ips[ip].scanner += ", " + ns;
+          currScanners.push(ns);
+        }
+      });
     } else {
-      state.ips[ip] = { ip, organization:ipData.organization||"", description:ipData.description||"", scanner:ipData.scanner||"JSON", scanDate:ipData.scanDate||"", vulns:(ipData.vulns||[]).map(v=>({evidence:[],...v})) };
+      const existKeys = new Set();
+      const uniqueVulns = [];
+      (ipData.vulns||[]).forEach(nv => {
+        const key = `${nv.name}|${nv.port}|${nv.protocol}`.toLowerCase();
+        if(!existKeys.has(key)) {
+          uniqueVulns.push({evidence:[], ...nv});
+          existKeys.add(key);
+        }
+      });
+      state.ips[ip] = { ip, organization:ipData.organization||"", description:ipData.description||"", scanner:ipData.scanner||"JSON", scanDate:ipData.scanDate||"", vulns:uniqueVulns };
     }
   });
 }
 
 function mergeIpData({ip, scanDate, scanner, vulns}) {
-  if(!ip||ip==="unknown") { const key=scanner+"-"+Date.now(); state.ips[key]={ip:key,organization:"",description:"",scanner,scanDate,vulns}; return; }
+  if(!ip || ip === "unknown") { 
+    const key = scanner + "-" + Date.now(); 
+    state.ips[key] = {ip:key, organization:"", description:"", scanner, scanDate, vulns}; 
+    return; 
+  }
+  
   if(state.ips[ip]) {
-    const existKeys = new Set(state.ips[ip].vulns.map(v=>v.name+v.port));
-    state.ips[ip].vulns.push(...vulns.filter(v=>!existKeys.has(v.name+v.port)));
-    if(!state.ips[ip].scanner.includes(scanner)) state.ips[ip].scanner += ", "+scanner;
+    const existKeys = new Set(state.ips[ip].vulns.map(v => `${v.name}|${v.port}|${v.protocol}`.toLowerCase()));
+    const newVulns = vulns.filter(v => {
+      const key = `${v.name}|${v.port}|${v.protocol}`.toLowerCase();
+      if(existKeys.has(key)) return false;
+      existKeys.add(key);
+      return true;
+    });
+    
+    state.ips[ip].vulns.push(...newVulns);
+    
+    const currScanners = state.ips[ip].scanner.split(",").map(s => s.trim());
+    if(!currScanners.includes(scanner)) {
+      state.ips[ip].scanner += ", " + scanner;
+    }
   } else {
-    state.ips[ip] = {ip, organization:"", description:"", scanner, scanDate, vulns};
+    const existKeys = new Set();
+    const uniqueVulns = vulns.filter(v => {
+      const key = `${v.name}|${v.port}|${v.protocol}`.toLowerCase();
+      if(existKeys.has(key)) return false;
+      existKeys.add(key);
+      return true;
+    });
+    
+    state.ips[ip] = {ip, organization:"", description:"", scanner, scanDate, vulns:uniqueVulns};
   }
 }
 
