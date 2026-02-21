@@ -29,7 +29,7 @@ Dashboard de inteligencia de vulnerabilidades. Permite procesar archivos XML gen
 ## Imágenes
 
 <img width="3826" height="2011" alt="imagen" src="https://github.com/user-attachments/assets/4becce89-733e-4f03-b26e-a6900e51171c" />
-*Dashboard general (sin datos agregados*
+*Dashboard general (sin datos agregados)*
 
 <img width="2845" height="1769" alt="Captura de pantalla 2026-02-21 080824" src="https://github.com/user-attachments/assets/304ef7d7-9664-4d67-95a7-b4643c9fe7ed" />
 *Dashboard por IP (con datos agregados)*
